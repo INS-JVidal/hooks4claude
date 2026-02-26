@@ -2,11 +2,19 @@
 .claude/
 
 # IDE
-.idea/
-.vscode/
+.idea
+.vscode
 
 # MCP config
 .mcp.json
+
+# Git-named placeholder files (recreated by dev environment)
+HEAD
+config
+objects
+hooks
+refs
+.gitconfig
 
 # Shell profile placeholders (0-byte dev env artifacts)
 .bash_profile
