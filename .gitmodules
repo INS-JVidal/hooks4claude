@@ -1,0 +1,6 @@
+[submodule "claude-hooks-monitor"]
+	path = claude-hooks-monitor
+	url = https://github.com/INS-JVidal/claude-hooks-monitor.git
+[submodule "hooks-store"]
+	path = hooks-store
+	url = https://github.com/jvidaldamm3/hooks-store.git

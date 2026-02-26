@@ -1,0 +1,17 @@
+# Claude Code session artifacts
+.claude/
+
+# IDE
+.idea/
+.vscode/
+
+# MCP config
+.mcp.json
+
+# Shell profile placeholders (0-byte dev env artifacts)
+.bash_profile
+.bashrc
+.profile
+.zprofile
+.zshrc
+.ripgreprc
