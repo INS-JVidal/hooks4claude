@@ -3,6 +3,19 @@
 This guide walks you through launching the complete system:
 **Claude hooks → hook-client → monitor → sink → hooks-store → MeiliSearch**
 
+## Clone
+
+```bash
+git clone --recurse-submodules https://github.com/INS-JVidal/hooks4claude.git
+cd hooks4claude
+```
+
+If you already cloned without `--recurse-submodules`:
+
+```bash
+git submodule update --init
+```
+
 ## Prerequisites
 
 | Component | Status check |
