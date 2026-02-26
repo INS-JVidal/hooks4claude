@@ -6,6 +6,22 @@ Two independent Go programs that form a pipeline:
 
 Each is a separate Go module with its own go.mod, git repo, and binary.
 
+## Repository Structure
+
+This is a **parent git repo** (`INS-JVidal/hooks4claude`) that uses **git submodules** to tie together the two sub-projects:
+
+```
+hooks4claude/                    ← parent repo (INS-JVidal/hooks4claude)
+├── CLAUDE.md, QUICKSTART.md     ← tracked by parent
+├── setup.sh, docs/, plans/      ← tracked by parent
+├── claude-hooks-monitor/        ← submodule (INS-JVidal/claude-hooks-monitor, branch: main)
+└── hooks-store/                 ← submodule (jvidaldamm3/hooks-store, branch: master)
+```
+
+Clone everything: `git clone --recurse-submodules https://github.com/INS-JVidal/hooks4claude.git`
+
+Update submodule pointers after pulling new commits inside a submodule: `git add <submodule> && git commit`
+
 ## Pipeline
 
 ```
