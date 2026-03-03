@@ -1,6 +1,6 @@
 # ML Algorithms & Technologies — Quick Reference
 
-*Extracted from ml-suitability-analysis.md and ml-decision-tables.md*
+*Extracted from 20260302-2240_ml-suitability-analysis.md and 20260303-0829_ml-decision-tables.md*
 
 ## Algorithms
 

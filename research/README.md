@@ -6,54 +6,54 @@ is observability for the user."
 
 ## Reading Order
 
-1. **[information-seeking-analysis.md](information-seeking-analysis.md)**
+1. **[20260228-1913_information-seeking-analysis.md](20260228-1913_information-seeking-analysis.md)**
    Data analysis of 3755 captured events. 56% info-seeking, 73% redundant
    re-reads, post-compaction bursts of 38+ calls. The empirical foundation.
 
-2. **[deep-memory-research.md](deep-memory-research.md)**
+2. **[20260228-1757_deep-memory-research.md](20260228-1757_deep-memory-research.md)**
    Tree-sitter, Spectral Clustering, Obsidian-style linking — three techniques
    explored for symbol-level, pattern, and associative memory.
 
-3. **[compaction-carry-forward.md](compaction-carry-forward.md)**
+3. **[20260228-1928_compaction-carry-forward.md](20260228-1928_compaction-carry-forward.md)**
    Strategy for PreCompact hook injection. Two-layer architecture proposed.
 
-4. **[mcp-tool-design.md](mcp-tool-design.md)**
+4. **[20260228-2003_mcp-tool-design.md](20260228-2003_mcp-tool-design.md)**
    MCP tool design for retrieval. 4 tools proposed, honestly assessed —
    Claude won't call them unprompted.
 
-5. **[progressive-disclosure-memory.md](progressive-disclosure-memory.md)**
+5. **[20260228-2027_progressive-disclosure-memory.md](20260228-2027_progressive-disclosure-memory.md)**
    Context+'s progressive disclosure applied to time. Session lifecycle
    discovery: SessionStart fires after compaction, same session_id survives
    restarts.
 
-6. **[conclusion.md](conclusion.md)**
+6. **[20260228-2037_conclusion.md](20260228-2037_conclusion.md)**
    Research conclusion: deep memory for Claude doesn't work. The value is
    observability for the user. The 73% re-read finding alone justifies
    hooks4claude — it tells users where their CLAUDE.md coverage is failing.
 
-7. **[compaction-function-carry-forward.md](compaction-function-carry-forward.md)** *(HIGH POTENTIAL)*
+7. **[20260228-2128_compaction-function-carry-forward.md](20260228-2128_compaction-function-carry-forward.md)** *(HIGH POTENTIAL)*
    Use tree-sitter + hook traces to carry actual function bodies across
    compaction — not summaries, real code. Reframes tree-sitter from grand
    memory system to surgical compaction recovery tool. Directly targets the
    73% re-read problem.
 
-8. **[carry-forward-experiment-results.md](carry-forward-experiment-results.md)** *(FAILED)*
+8. **[20260301-1102_carry-forward-experiment-results.md](20260301-1102_carry-forward-experiment-results.md)** *(FAILED)*
    Carry-forward file manifest injection — 3 A/B experiments showed injecting
    file lists after compaction increases re-reads (14 baseline vs 24-32 with
    manifest). The "shopping list effect": Claude visits every file mentioned
    regardless of framing. Approach abandoned, code removed.
 
-9. **[work-log-vision.md](work-log-vision.md)** *(CURRENT DIRECTION)*
+9. **[20260301-1112_work-log-vision.md](20260301-1112_work-log-vision.md)** *(CURRENT DIRECTION)*
    hooks4claude as a centralized work log. What already works (multi-session,
    multi-project capture), what's missing (assistant responses, semantic
    summaries, dashboard, cross-session linking), and three possible directions.
 
-10. **[logbook-features.md](logbook-features.md)** *(FEATURE SPEC)*
+10. **[20260301-1141_logbook-features.md](20260301-1141_logbook-features.md)** *(FEATURE SPEC)*
     13 features across 3 layers (data, query, presentation) to turn hooks4claude
     into a project logbook. 5 implementation phases. Builds on untapped fields
     discovery.
 
-11. **[work-log-challenges.md](work-log-challenges.md)** *(ACTIONABLE)*
+11. **[20260301-1121_work-log-challenges.md](20260301-1121_work-log-challenges.md)** *(ACTIONABLE)*
     Feasibility research for 4 work-log challenges. Key discovery: `last_assistant_message`
     from Stop hook already captures Claude's responses. `transcript_path` enables
     cross-session linking. Challenges 1+2 are tightly coupled and lowest effort.

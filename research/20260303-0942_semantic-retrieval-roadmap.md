@@ -3,7 +3,7 @@
 **Date:** 2026-03-03
 **Status:** Design phase
 **Depends on:** hooks-mcp, hooks-store, MeiliSearch, Ollama (optional)
-**Related:** [semantic-prompt-retrieval.md](semantic-prompt-retrieval.md), [ml-topic-keyword-analysis.md](ml-topic-keyword-analysis.md)
+**Related:** [20260303-0911_semantic-prompt-retrieval.md](20260303-0911_semantic-prompt-retrieval.md), [20260302-2155_ml-topic-keyword-analysis.md](20260302-2155_ml-topic-keyword-analysis.md)
 
 ---
 
@@ -244,7 +244,7 @@ Return structured results for Claude to reason over.
       "timestamp": "2026-03-01T14:23:00Z",
       "prompt": "explore LDA for document clustering",
       "tools_used": ["WebSearch", "Read"],
-      "files_touched": ["research/ml-topic-keyword-analysis.md"],
+      "files_touched": ["research/20260302-2155_ml-topic-keyword-analysis.md"],
       "similarity_score": 0.91
     }
   ]

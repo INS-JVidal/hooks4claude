@@ -1,7 +1,7 @@
 # MCP Tool Design for Deep Memory
 
 **Date:** 2026-02-28
-**Prerequisite reading:** [compaction-carry-forward.md](compaction-carry-forward.md)
+**Prerequisite reading:** [20260228-1928_compaction-carry-forward.md](20260228-1928_compaction-carry-forward.md)
 
 ## Architecture: Hooks vs MCP Tools
 

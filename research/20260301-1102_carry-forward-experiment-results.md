@@ -80,7 +80,7 @@ Manifest wording: "Do NOT re-read these files unless you need to edit them. Use 
 
 When Claude receives a list of files after compaction — regardless of framing — it treats the list as implicit work items. Each file mentioned becomes something Claude "should" visit, even when explicitly told not to.
 
-This is consistent with the finding in [conclusion.md](conclusion.md): "Claude won't query memory unprompted." The mirror is also true: **Claude will act on memory it didn't ask for.** Unsolicited context creates unsolicited work.
+This is consistent with the finding in [20260228-2037_conclusion.md](20260228-2037_conclusion.md): "Claude won't query memory unprompted." The mirror is also true: **Claude will act on memory it didn't ask for.** Unsolicited context creates unsolicited work.
 
 ### Why Run 1 Appeared Positive
 
@@ -114,7 +114,7 @@ Claude's built-in compaction summary + CLAUDE.md re-injection already provides e
 
 The mechanism is fundamentally flawed: listing files in post-compaction context gives Claude a "shopping list" it feels compelled to visit. The problem isn't the wording or framing — it's the act of presenting a file list itself.
 
-This reinforces the project's pivot toward **observability for users** rather than **memory for Claude**. The 73% re-read finding from [information-seeking-analysis.md](information-seeking-analysis.md) tells users where their CLAUDE.md coverage is failing — that's the actionable insight, not trying to inject context that Claude will misinterpret.
+This reinforces the project's pivot toward **observability for users** rather than **memory for Claude**. The 73% re-read finding from [20260228-1913_information-seeking-analysis.md](20260228-1913_information-seeking-analysis.md) tells users where their CLAUDE.md coverage is failing — that's the actionable insight, not trying to inject context that Claude will misinterpret.
 
 ## Code Disposition
 

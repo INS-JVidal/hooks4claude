@@ -328,10 +328,10 @@ The research concluded that Claude won't query memory tools unprompted because i
 
 ## Relationship to Prior Research
 
-- **information-seeking-analysis.md**: Established the 73% redundant re-read finding and post-compaction burst of 38+ calls. This proposal directly targets that.
-- **compaction-carry-forward.md**: Proposed a ~600-token summary carry-forward. This extends it to actual code content. **Key correction**: that doc assumed PreCompact could inject context directly — it cannot. The two-step relay (PreCompact → cache → SessionStart → inject) is the correct mechanism.
-- **deep-memory-research.md**: Proposed tree-sitter for general symbol-level memory. This narrows the scope to compaction recovery only.
-- **conclusion.md**: Said deep memory for Claude doesn't work. This sidesteps that — it's not memory retrieval (Claude won't query), it's proactive injection at a known trigger point.
+- **20260228-1913_information-seeking-analysis.md**: Established the 73% redundant re-read finding and post-compaction burst of 38+ calls. This proposal directly targets that.
+- **20260228-1928_compaction-carry-forward.md**: Proposed a ~600-token summary carry-forward. This extends it to actual code content. **Key correction**: that doc assumed PreCompact could inject context directly — it cannot. The two-step relay (PreCompact → cache → SessionStart → inject) is the correct mechanism.
+- **20260228-1757_deep-memory-research.md**: Proposed tree-sitter for general symbol-level memory. This narrows the scope to compaction recovery only.
+- **20260228-2037_conclusion.md**: Said deep memory for Claude doesn't work. This sidesteps that — it's not memory retrieval (Claude won't query), it's proactive injection at a known trigger point.
 
 ---
 

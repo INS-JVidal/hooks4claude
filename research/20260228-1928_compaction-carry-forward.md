@@ -1,7 +1,7 @@
 # Compaction Carry-Forward Strategy
 
 **Date:** 2026-02-28
-**Prerequisite reading:** [information-seeking-analysis.md](information-seeking-analysis.md)
+**Prerequisite reading:** [20260228-1913_information-seeking-analysis.md](20260228-1913_information-seeking-analysis.md)
 
 ## Problem
 
@@ -34,7 +34,7 @@ The PreCompact hook fires before every compaction (5 observed events, all with
 
 ## What to carry forward
 
-Ranked by re-read elimination value (from [information-seeking-analysis.md](information-seeking-analysis.md)):
+Ranked by re-read elimination value (from [20260228-1913_information-seeking-analysis.md](20260228-1913_information-seeking-analysis.md)):
 
 ### 1. Active file manifest
 
@@ -198,4 +198,4 @@ MeiliSearch data. Layer 2 requires an MCP server or SessionStart injection.
    compacted context (test with a simple hook that returns static text)
 2. Build a prototype carry-forward query in hook-client
 3. Measure: does the info burst disappear after carry-forward injection?
-4. Design the Layer 2 retrieval API (see [deep-memory-research.md](deep-memory-research.md))
+4. Design the Layer 2 retrieval API (see [20260228-1757_deep-memory-research.md](20260228-1757_deep-memory-research.md))

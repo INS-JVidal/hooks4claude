@@ -1,7 +1,7 @@
 # Progressive Disclosure for Deep Memory
 
 **Date:** 2026-02-28
-**Prerequisite reading:** [compaction-carry-forward.md](compaction-carry-forward.md), [mcp-tool-design.md](mcp-tool-design.md)
+**Prerequisite reading:** [20260228-1928_compaction-carry-forward.md](20260228-1928_compaction-carry-forward.md), [20260228-2003_mcp-tool-design.md](20260228-2003_mcp-tool-design.md)
 
 ## Session Lifecycle Discovery
 

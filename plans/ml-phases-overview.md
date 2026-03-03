@@ -1,6 +1,6 @@
 # ML Enhancement Phases — Overview
 
-*Derived from research/ml-suitability-analysis.md (March 2026)*
+*Derived from research/20260302-2240_ml-suitability-analysis.md (March 2026)*
 
 ## Phase Map
 
@@ -26,4 +26,4 @@ Each phase is independent and produces value on its own. Later phases build on e
 
 ## Key Constraint
 
-At 100-200 sessions, heuristics beat most ML. The exceptions: pre-trained embeddings (Phase 1), topic modeling (Phase 3), and file co-modification patterns (Phase 4). See research/ml-suitability-analysis.md for full analysis.
+At 100-200 sessions, heuristics beat most ML. The exceptions: pre-trained embeddings (Phase 1), topic modeling (Phase 3), and file co-modification patterns (Phase 4). See research/20260302-2240_ml-suitability-analysis.md for full analysis.

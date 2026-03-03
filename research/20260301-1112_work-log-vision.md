@@ -85,6 +85,6 @@ New features build *on top of* MeiliSearch, not inside the capture pipeline. The
 
 ## Relationship to Failed Experiments
 
-The carry-forward experiment ([carry-forward-experiment-results.md](carry-forward-experiment-results.md)) tried to use captured data to improve Claude's behavior. That failed — Claude misinterprets injected context.
+The carry-forward experiment ([20260301-1102_carry-forward-experiment-results.md](20260301-1102_carry-forward-experiment-results.md)) tried to use captured data to improve Claude's behavior. That failed — Claude misinterprets injected context.
 
 This vision is different: the data serves the **user**, not Claude. The user reviews their work history, tracks progress, and understands patterns. This aligns with the project's core finding: **hooks4claude's value is observability for humans, not memory for machines.**
