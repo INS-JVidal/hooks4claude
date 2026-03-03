@@ -1,0 +1,43 @@
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.36.0
+    ports:
+      - "127.0.0.1:7700:7700"
+    volumes:
+      - /home/opos/.local/share/meilisearch:/meili_data
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:7700/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  hooks-store:
+    build: ./hooks-store
+    ports:
+      - "127.0.0.1:9800:9800"
+    environment:
+      BIND_ADDR: "0.0.0.0"
+      MEILI_URL: "http://meilisearch:7700"
+    tty: true
+    stdin_open: true
+    depends_on:
+      meilisearch:
+        condition: service_healthy
+    restart: unless-stopped
+
+  monitor:
+    build: ./claude-hooks-monitor
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      BIND_ADDR: "0.0.0.0"
+    tty: true
+    stdin_open: true
+    profiles:
+      - full
+    restart: unless-stopped
+

@@ -1,8 +1,9 @@
 # hooks4claude — Hook monitoring and storage system for Claude Code
 
-Two independent Go programs that form a pipeline:
+Three independent Go programs that form a pipeline:
 1. **claude-hooks-monitor** — Receives hook events from Claude Code via hook-client, displays in console/TUI, optionally forwards to hooks-store
 2. **hooks-store** — Ingests events via HTTP, indexes into MeiliSearch for search and filtering
+3. **hooks-mcp** — MCP server exposing 8 read-only tools wrapping MeiliSearch queries on hook data
 
 Each is a separate Go module with its own go.mod, git repo, and binary.
 
@@ -15,7 +16,8 @@ hooks4claude/                    ← parent repo (INS-JVidal/hooks4claude)
 ├── CLAUDE.md, QUICKSTART.md     ← tracked by parent
 ├── setup.sh, docs/, plans/      ← tracked by parent
 ├── claude-hooks-monitor/        ← submodule (INS-JVidal/claude-hooks-monitor, branch: main)
-└── hooks-store/                 ← submodule (jvidaldamm3/hooks-store, branch: master)
+├── hooks-store/                 ← submodule (jvidaldamm3/hooks-store, branch: master)
+└── hooks-mcp/                   ← MCP server for MeiliSearch hook queries (local, not yet a submodule)
 ```
 
 Clone everything: `git clone --recurse-submodules https://github.com/INS-JVidal/hooks4claude.git`
@@ -29,7 +31,10 @@ Claude Code                hooks-client               monitor                   
 ───────────                ────────────               ───────                    ───────────
 Hook fires ──→ hook-client ──→ POST /hook/<Type> ──→ HookMonitor ──→ HTTPSink ──→ POST /ingest ──→ MeiliSearch
                (stdin JSON,    (loopback only)        ├─ console log                                (search/filter)
-                exit 0)                               └─ TUI eventCh
+                exit 0)                               └─ TUI eventCh                                     ↑
+                                                                                                         │
+Claude Code ──→ hooks-mcp (MCP stdio) ──→ MeiliSearch queries ──────────────────────────────────────────┘
+               (8 read-only tools)
 ```
 
 hook-client is a **separate binary** because Claude Code spawns it per-event and expects exit 0 immediately.
@@ -46,6 +51,10 @@ cd claude-hooks-monitor && make run-ui
 
 # Store (Terminal 2) — requires MeiliSearch running on :7700
 cd hooks-store && make run
+
+# MCP Server — register with Claude Code (requires MeiliSearch)
+cd hooks-mcp && make install
+claude mcp add --transport stdio --scope project hooks-mcp -- hooks-mcp
 ```
 
 ## HTTP API
@@ -75,9 +84,16 @@ cd hooks-store && make run
 
 | Source | Keys |
 |--------|------|
-| CLI flags | `--port`, `--meili-url`, `--meili-key`, `--meili-index` |
-| Env vars | `HOOKS_STORE_PORT`, `MEILI_URL`, `MEILI_KEY`, `MEILI_INDEX` |
+| CLI flags | `--port`, `--meili-url`, `--meili-key`, `--meili-index`, `--prompts-index`, `--sessions-index` |
+| Env vars | `HOOKS_STORE_PORT`, `MEILI_URL`, `MEILI_KEY`, `MEILI_INDEX`, `PROMPTS_INDEX`, `SESSIONS_INDEX` |
 | Config file | `hooks-store.conf` (lowest priority) |
+
+### hooks-mcp
+
+| Source | Keys |
+|--------|------|
+| Env vars | `MEILI_URL` (default localhost:7700), `MEILI_KEY`, `MEILI_INDEX` (hook-events), `PROMPTS_INDEX` (hook-prompts), `SESSIONS_INDEX` (hook-sessions) |
+| No CLI flags | stdio MCP servers read env only |
 
 ## File Architecture Map
 
@@ -102,6 +118,21 @@ claude-hooks-monitor/internal/server/ — HTTP handlers + middleware. Key funcs:
 claude-hooks-monitor/internal/sink/ — Event forwarding. Key types: EventSink, HTTPSink. Key funcs: NewHTTPSink, Send.
 claude-hooks-monitor/internal/platform/ — OS-specific lock/signals (flock on Unix, LockFileEx on Windows). Key funcs: AcquireLock, ShowRunningInstance.
 claude-hooks-monitor/internal/tui/ — Interactive tree UI. 6 files: model, tree, processor, detail, hooks_menu, styles. Key types: Model, Session, EventProcessor. Key funcs: Run, FlattenTree.
+
+### hooks-mcp packages
+
+hooks-mcp/cmd/hooks-mcp/ — Entry point. Env config, MeiliSearch health check, MCP server + stdio.
+
+hooks-mcp/internal/dateparse/ — Date range parsing ("today", "last 3 days" → DateRange). Key types: DateRange. Key funcs: ParseRange.
+hooks-mcp/internal/format/ — Pure formatting functions. Key funcs: Table, Tree, BarChart, FormatDuration, FormatCost, FormatTokens, ShortID.
+hooks-mcp/internal/meili/ — Typed MeiliSearch client. Key types: Searcher (interface), MeiliClient, SessionHit, PromptHit, EventHit. Key funcs: NewMeiliClient, ResolveSessionPrefix.
+hooks-mcp/internal/tools/ — 8 MCP tool handlers. Key funcs: RegisterAll. Tools: query-sessions, query-prompts, session-summary, project-activity, search-events, error-analysis, cost-analysis, tool-usage.
+
+## Querying Hook Data in MeiliSearch
+
+See [docs/meilisearch-query-guide.md](docs/meilisearch-query-guide.md) for schema, query patterns, and recipes. Read it before querying the database.
+
+For the integration strategy (MCP server, slash commands, custom agents) see [docs/meilisearch-integration-strategy.md](docs/meilisearch-integration-strategy.md).
 
 ## Active Files (read source before editing, don't rely on summaries)
 
