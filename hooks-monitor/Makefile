@@ -1,0 +1,162 @@
+# Claude Code Hooks Monitor — Makefile
+# Usage: make help
+
+ifeq ($(OS),Windows_NT)
+  EXE := .exe
+else
+  EXE :=
+endif
+
+BINARY      := bin/monitor$(EXE)
+PORT        ?= 8080
+GO          := $(shell which go 2>/dev/null || echo /usr/local/go/bin/go)
+VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS     := -s -w -X main.version=$(VERSION)
+HOOK_DIR    := hooks
+CONF        := $(HOOK_DIR)/hook_monitor.conf
+
+.PHONY: help deps build run run-ui run-background test test-api send-test-hook \
+        clean install install-hooks install-command check stats show-config reset-config show-hooks-config
+
+help: ## Show all targets with descriptions
+	@echo ""
+	@echo "  Claude Code Hooks Monitor"
+	@echo "  ─────────────────────────"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@echo ""
+
+deps: ## Install Go deps
+	@echo "Checking Go dependencies..."
+	$(GO) mod tidy
+	@command -v jq >/dev/null 2>&1 || { echo "Warning: jq not found. Install: sudo apt install jq"; }
+	@echo "Dependencies OK."
+
+build: ## Build monitor server
+	@mkdir -p bin
+	$(GO) build -ldflags="$(LDFLAGS)" -o $(BINARY) ./cmd/monitor
+	@echo "Built $(BINARY)"
+
+run: ## Run server (foreground, console output)
+	@echo "Starting monitor on port $(PORT)..."
+	PORT=$(PORT) $(GO) run ./cmd/monitor
+
+run-ui: build ## Run server with interactive tree UI
+	PORT=$(PORT) ./$(BINARY) --ui
+
+run-background: ## Run server in background (output to monitor.log)
+ifeq ($(OS),Windows_NT)
+	@echo "run-background is not supported on Windows. Use 'make run' in a separate terminal."
+else
+	@mkdir -p bin
+	$(GO) build -ldflags="$(LDFLAGS)" -o $(BINARY) ./cmd/monitor
+	PORT=$(PORT) nohup ./$(BINARY) > monitor.log 2>&1 &
+	@sleep 1
+	@echo "Server started in background (PID $$(lsof -ti:$(PORT) 2>/dev/null || echo '?'))"
+	@echo "Log: tail -f monitor.log"
+endif
+
+test: ## Run full test suite (requires running server)
+	@./test-hooks.sh
+
+test-api: ## Test API endpoints with curl
+	@echo "Health:"
+	@curl -sf http://localhost:$(PORT)/health | jq .
+	@echo ""
+	@echo "Stats:"
+	@curl -sf http://localhost:$(PORT)/stats | jq .
+	@echo ""
+	@echo "Last 3 events:"
+	@curl -sf "http://localhost:$(PORT)/events?limit=3" | jq .
+
+send-test-hook: ## Send a single test event
+	@curl -s -X POST http://localhost:$(PORT)/hook/PreToolUse \
+		-H "Content-Type: application/json" \
+		-d '{"hook_event_name":"PreToolUse","session_id":"manual","cwd":"/tmp","permission_mode":"default","tool_name":"Bash","tool_input":{"command":"echo hello"}}' \
+		| jq .
+
+clean: ## Remove build artifacts and logs
+	rm -rf bin/
+	rm -f monitor.log
+	@echo "Cleaned."
+
+install: build ## Install monitor binary + config system-wide
+	@mkdir -p ~/.local/bin ~/.config/claude-hooks-monitor
+	cp $(BINARY) ~/.local/bin/claude-hooks-monitor
+	chmod +x ~/.local/bin/claude-hooks-monitor
+	cp -n $(CONF) ~/.config/claude-hooks-monitor/ 2>/dev/null || true
+	@echo ""
+	@echo "  Installed:"
+	@echo "    ~/.local/bin/claude-hooks-monitor"
+	@echo "    ~/.config/claude-hooks-monitor/hook_monitor.conf"
+	@echo ""
+	@echo "  Install hook-client separately: cd ../hooks-client && make install"
+
+install-hooks: ## Register hooks in global ~/.claude/settings.json
+	@mkdir -p ~/.claude/commands
+	@hook-client install-hooks || echo "hook-client not in PATH — build it from ../hooks-client first"
+	@cp ../slash-commands/monitor-hooks-global.md ~/.claude/commands/monitor-hooks.md 2>/dev/null && \
+		echo "Installed /monitor-hooks command to ~/.claude/commands/" || true
+
+install-command: ## Install /monitor-hooks slash command into another project
+	@if [ -z "$(PROJECT)" ]; then \
+		echo "Usage: make install-command PROJECT=~/my-project"; \
+		echo ""; \
+		echo "Installs the /monitor-hooks slash command into the target project."; \
+		echo "Rewrites paths so the command works from any project directory."; \
+		exit 1; \
+	fi
+	@mkdir -p "$(PROJECT)/.claude/commands"
+	@ESCAPED_DIR=$$(printf '%s\n' "$(CURDIR)" | sed -e 's/[\/&]/\\&/g'); \
+	sed "s|\$$CLAUDE_PROJECT_DIR|$$ESCAPED_DIR|g" "./.claude/commands/monitor-hooks.md" \
+		> "$(PROJECT)/.claude/commands/monitor-hooks.md"
+	@echo "Installed /monitor-hooks command to $(PROJECT)/.claude/commands/monitor-hooks.md"
+	@echo "The command references this monitor at: $(CURDIR)"
+
+check: ## Check if server is running
+	@curl -sf http://localhost:$(PORT)/health > /dev/null 2>&1 \
+		&& echo "Server is running on port $(PORT)" \
+		|| echo "Server is NOT running on port $(PORT)"
+
+stats: ## Show hook statistics
+	@curl -sf http://localhost:$(PORT)/stats | jq .
+
+show-config: ## Display current hook toggle state
+	@echo ""
+	@echo "  Hook Monitor Configuration ($(CONF))"
+	@echo "  ────────────────────────────────────"
+	@grep -E '^[A-Za-z]' $(CONF) | while read line; do \
+		if echo "$$line" | grep -q "= yes"; then \
+			echo "  \033[32m$$line\033[0m"; \
+		else \
+			echo "  \033[31m$$line\033[0m"; \
+		fi; \
+	done
+	@echo ""
+
+reset-config: ## Reset hook config to all-enabled defaults
+	@sed -i 's/= no/= yes/g' $(CONF)
+	@echo "All hooks reset to enabled."
+
+show-hooks-config: ## Print hooks JSON snippet for .claude/settings.json
+	@HOOK_CLIENT="$(CURDIR)/../hooks-client/bin/hook-client$(EXE)"; \
+	echo ""; \
+	echo "  Add this to your project's .claude/settings.json to monitor hooks:"; \
+	echo "  (hook-client path: $$HOOK_CLIENT)"; \
+	echo ""; \
+	echo '  "hooks": {'; \
+	first=true; \
+	for event in SessionStart SessionEnd UserPromptSubmit PreToolUse PostToolUse PostToolUseFailure \
+	             Notification PermissionRequest Stop SubagentStart SubagentStop TeammateIdle \
+	             TaskCompleted ConfigChange PreCompact; do \
+		if [ "$$first" = true ]; then first=false; else echo ','; fi; \
+		case "$$event" in \
+			PreToolUse|PostToolUse|PostToolUseFailure) \
+				printf '    "%s": [{"matcher": "*", "hooks": [{"type": "command", "command": "\"%s\""}]}]' "$$event" "$$HOOK_CLIENT" ;; \
+			*) \
+				printf '    "%s": [{"hooks": [{"type": "command", "command": "\"%s\""}]}]' "$$event" "$$HOOK_CLIENT" ;; \
+		esac; \
+	done; \
+	echo ""; \
+	echo '  }'; \
+	echo ""

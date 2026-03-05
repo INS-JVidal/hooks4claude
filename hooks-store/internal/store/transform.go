@@ -3,6 +3,7 @@ package store
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"hooks-store/internal/hookevt"
 
@@ -12,11 +13,15 @@ import (
 // HookEventToDocument transforms a wire-format HookEvent into a
 // MeiliSearch-ready Document with derived fields for search and filtering.
 func HookEventToDocument(evt hookevt.HookEvent) Document {
+	ts := evt.Timestamp
+	if ts.IsZero() {
+		ts = time.Now()
+	}
 	doc := Document{
 		ID:            uuid.New().String(),
 		HookType:      evt.HookType,
-		Timestamp:     evt.Timestamp.UTC().Format("2006-01-02T15:04:05.000Z"),
-		TimestampUnix: evt.Timestamp.Unix(),
+		Timestamp:     ts.UTC().Format("2006-01-02T15:04:05.000Z"),
+		TimestampUnix: ts.Unix(),
 		Data:          evt.Data,
 	}
 
@@ -62,6 +67,9 @@ func HookEventToDocument(evt hookevt.HookEvent) Document {
 		}
 		if pd, ok := extractString(monitor, "project_dir"); ok {
 			doc.ProjectDir = pd
+		}
+		if pn, ok := extractString(monitor, "project_name"); ok {
+			doc.ProjectName = pn
 		}
 	}
 

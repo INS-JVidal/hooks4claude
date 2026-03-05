@@ -23,3 +23,17 @@ refs
 .zprofile
 .zshrc
 .ripgreprc
+
+# Build artifacts
+**/bin/
+**/target/
+
+# Logs
+logs/
+
+# ML model files
+embed-svc/model/
+
+# Meilisearch data (legacy)
+meilisearch/data/
+hooks-client/hooks-client

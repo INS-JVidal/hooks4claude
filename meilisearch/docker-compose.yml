@@ -16,12 +16,15 @@ services:
     restart: unless-stopped
 
   hooks-store:
-    build: ./hooks-store
+    build: ../hooks-store
     ports:
       - "127.0.0.1:9800:9800"
+    volumes:
+      - /tmp/hooks-store.sock:/tmp/hooks-store.sock
     environment:
       BIND_ADDR: "0.0.0.0"
       MEILI_URL: "http://meilisearch:7700"
+      HOOKS_STORE_SOCK: "/tmp/hooks-store.sock"
     tty: true
     stdin_open: true
     depends_on:
@@ -30,11 +33,14 @@ services:
     restart: unless-stopped
 
   monitor:
-    build: ./claude-hooks-monitor
+    build: ../hooks-monitor
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      - /tmp/hook-monitor.sock:/tmp/hook-monitor.sock
     environment:
       BIND_ADDR: "0.0.0.0"
+      HOOK_MONITOR_SOCK: "/tmp/hook-monitor.sock"
     tty: true
     stdin_open: true
     profiles:

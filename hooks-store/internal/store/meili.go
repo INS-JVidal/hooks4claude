@@ -1,3 +1,5 @@
+//go:build meili
+
 package store
 
 import (

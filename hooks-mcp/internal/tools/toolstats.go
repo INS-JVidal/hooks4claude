@@ -47,7 +47,11 @@ func makeToolUsage(s meili.Searcher) mcp.ToolHandlerFor[ToolUsageInput, any] {
 		}
 
 		var b strings.Builder
-		fmt.Fprintf(&b, "Tool Usage (%d total tool calls):\n\n", facets.TotalHits)
+		if facets.Approximate {
+			fmt.Fprintf(&b, "Tool Usage (%d+ total tool calls, counts approximate):\n\n", facets.TotalHits)
+		} else {
+			fmt.Fprintf(&b, "Tool Usage (%d total tool calls):\n\n", facets.TotalHits)
+		}
 
 		// Tool distribution bar chart.
 		if toolDist, ok := facets.Distribution["tool_name"]; ok && len(toolDist) > 0 {
@@ -73,8 +77,8 @@ func makeToolUsage(s meili.Searcher) mcp.ToolHandlerFor[ToolUsageInput, any] {
 		if resolved.SessionID != "" {
 			// Single session — get file details.
 			sessions, _, err := s.SearchSessions(ctx, meili.SessionSearchOpts{
-				Query: resolved.SessionID,
-				Limit: 1,
+				SessionID: resolved.SessionID,
+				Limit:     1,
 			})
 			if err != nil {
 				return errResult(fmt.Sprintf("fetching sessions: %s", err)), nil, nil

@@ -1,19 +1,13 @@
 # Quickstart — Running the Full Hook Pipeline
 
 This guide walks you through launching the complete system:
-**Claude hooks → hook-client → monitor → sink → hooks-store → MeiliSearch**
+**Claude hooks → hooks-client → monitor → sink → hooks-store → Milvus**
 
 ## Clone
 
 ```bash
-git clone --recurse-submodules https://github.com/INS-JVidal/hooks4claude.git
+git clone https://github.com/INS-JVidal/hooks4claude.git
 cd hooks4claude
-```
-
-If you already cloned without `--recurse-submodules`:
-
-```bash
-git submodule update --init
 ```
 
 ## Prerequisites
@@ -21,6 +15,8 @@ git submodule update --init
 | Component | Status check |
 |-----------|-------------|
 | Go 1.25+  | `go version` |
+| Docker + Compose | `docker compose version` |
+| Rust (for embed-svc) | `rustc --version` |
 | curl + jq | `which curl jq` |
 
 ## Architecture Overview
@@ -31,12 +27,12 @@ Claude Code session
   ├─ hook events (stdin JSON)
   │
   ▼
-hook-client  (binary, runs per-event)
+hooks-client  (binary, runs per-event)
   │
   ├─ POST /hook/<HookType>
   │
   ▼
-claude-hooks-monitor  (long-running, port 8080)
+hooks-monitor  (long-running, port 8080)
   │
   ├─ TUI display + /stats /events /health API
   │
@@ -45,66 +41,77 @@ claude-hooks-monitor  (long-running, port 8080)
   │   ▼
   hooks-store  (long-running, port 9800)
   │
-  ├─ transform + index
+  ├─ embed via embed-svc (port 8900) + index
   │   ▼
-  MeiliSearch  (long-running, port 7700)
+  Milvus  (port 19530, via Docker)
 ```
 
 ---
 
-## Step 1 — Install & Start MeiliSearch
+## Step 1 — Start Milvus (Docker)
 
 ```bash
-cd hooks-store
-
-# Option A: install binary to ~/.local/bin
-./scripts/install-meili.sh
-
-# Option B: install as systemd user service (auto-start on login)
-./scripts/install-meili.sh --service
+cd docker
+docker compose up -d
 ```
 
-If you chose Option A, start it manually:
+Wait for healthy status:
 
 ```bash
-meilisearch --db-path ~/.local/share/meilisearch/data.ms --http-addr 127.0.0.1:7700
+docker compose ps
+# All 3 services (etcd, minio, milvus) should show "healthy"
 ```
 
-Verify it's running:
+Verify Milvus is responding:
 
 ```bash
-curl -s http://localhost:7700/health | jq .
-# Expected: {"status":"available"}
+curl -s http://localhost:19530/v2/vectordb/collections/list | jq .
+# Expected: {"code":0,"data":[]}
 ```
 
-## Step 2 — Configure MeiliSearch Index
+Milvus WebUI is available at http://localhost:9091/webui/
 
-Run once to set up searchable/filterable/sortable attributes:
+### Attu (Milvus GUI)
 
 ```bash
-cd hooks-store
-./scripts/setup-meili-index.sh
+docker run --network host -e MILVUS_URL=127.0.0.1:19530 zilliz/attu:v2.6
 ```
 
-You should see:
+Open http://localhost:3000 — login with username `root`, leave password empty.
 
+Or start it with the full stack: `docker compose -f docker/docker-compose.yml up -d`
+
+## Step 2 — Start Embedding Service (Optional)
+
+The embedding service enables semantic/vector search. Without it, hooks-store falls back to zero vectors (scalar search still works).
+
+```bash
+cd embed-svc
+
+# Download the ONNX model (one-time, ~90MB)
+make download-model
+
+# Build and run
+make run
 ```
-Configuring index 'hook-events'...
-  Creating index... ok
-  Setting searchable attributes... ok
-  Setting filterable attributes... ok
-  Setting sortable attributes... ok
+
+Verify:
+
+```bash
+curl -s http://localhost:8900/health | jq .
+# Expected: {"status":"ok","model":"all-MiniLM-L6-v2","dimensions":384}
 ```
 
 ## Step 3 — Build Binaries
 
 ```bash
 # From the project root
-cd claude-hooks-monitor && make build && cd ..
+cd hooks-monitor && make build && cd ..
 cd hooks-store && make build && cd ..
+cd hooks-mcp && make build && cd ..
 ```
 
-## Step 4 — Start hooks-store (companion)
+## Step 4 — Start hooks-store
 
 In a **dedicated terminal**:
 
@@ -112,33 +119,24 @@ In a **dedicated terminal**:
 cd hooks-store
 ./bin/hooks-store
 # Or with custom settings:
-# ./bin/hooks-store --port 9800 --meili-url http://localhost:7700
+# ./bin/hooks-store --milvus-url http://localhost:19530 --embed-url http://localhost:8900
 ```
 
 You should see:
 
 ```
-Connecting to MeiliSearch at http://localhost:7700...
-──────────────────────────────────────────────────────
-  hooks-store dev
-──────────────────────────────────────────────────────
-  MeiliSearch: http://localhost:7700 (index: hook-events)
-  Listening:   http://localhost:9800
-  Endpoints:   POST /ingest  GET /health  GET /stats
-──────────────────────────────────────────────────────
-  Waiting for events...
+Connecting to Milvus at http://localhost:19530...
 ```
 
 Verify:
 
 ```bash
-make companion-health
-# Expected: {"status":"ok","meili":"connected"}
+curl -s http://localhost:9800/health | jq .
 ```
 
 ## Step 5 — Enable Sink Forwarding in Monitor Config
 
-Edit `~/.config/claude-hooks-monitor/hook_monitor.conf` and add the `[sink]` section:
+Edit `~/.config/hooks-monitor/hook_monitor.conf` and add the `[sink]` section:
 
 ```ini
 [hooks]
@@ -158,7 +156,7 @@ endpoint = http://localhost:9800/ingest
 In another **dedicated terminal**:
 
 ```bash
-cd claude-hooks-monitor
+cd hooks-monitor
 
 # Console mode (see events scroll by):
 make run
@@ -167,26 +165,21 @@ make run
 make run-ui
 ```
 
-Verify:
+## Step 7 — Register MCP Server (Optional)
+
+For querying hook data from within Claude Code:
 
 ```bash
-make check
-# Expected: Server is running on port 8080
+cd hooks-mcp && make install
+claude mcp add --transport stdio --scope project hooks-mcp -- hooks-mcp
 ```
 
-## Step 7 — Verify Claude Hooks Are Registered
-
-The hooks are already registered in `~/.claude/settings.json` (all 15 hook types).
-They point to `hook-client` which must be in your PATH:
+Set environment variables if using non-default ports:
 
 ```bash
-which hook-client
-# Expected: /home/opos/.local/bin/hook-client
+export MILVUS_URL=http://localhost:19530
+export EMBED_SVC_URL=http://localhost:8900
 ```
-
-If not found, either:
-- Run `make install` from `claude-hooks-monitor/` to copy binaries to `~/.local/bin/`
-- Or ensure `~/.local/bin` is in your PATH: `export PATH="$HOME/.local/bin:$PATH"`
 
 ## Step 8 — Test the Pipeline
 
@@ -194,13 +187,10 @@ If not found, either:
 
 ```bash
 # Send a test event directly to the monitor
-cd claude-hooks-monitor && make send-test-hook
+cd hooks-monitor && make send-test-hook
 
 # Check it arrived at hooks-store
-cd ../hooks-store && make companion-stats
-
-# Search for it in MeiliSearch
-make meili-search Q="Bash"
+cd ../hooks-store && curl -s http://localhost:9800/stats | jq .
 ```
 
 ### Live test (with Claude):
@@ -209,19 +199,6 @@ Simply start a new Claude Code session in any project.
 The hooks fire automatically — every tool use, prompt submit, session start, etc.
 Watch the monitor terminal for live events scrolling by.
 
-```bash
-# In a third terminal, check stats accumulating:
-cd hooks-store && make companion-stats
-
-# Search all indexed events:
-make meili-search Q="Write"
-
-# Filter by hook type:
-curl -s 'http://localhost:7700/indexes/hook-events/search' \
-  -H 'Content-Type: application/json' \
-  -d '{"filter":"hook_type = PreToolUse","sort":["timestamp_unix:desc"],"limit":5}' | jq .
-```
-
 ---
 
 ## Terminal Layout (Recommended)
@@ -229,8 +206,8 @@ curl -s 'http://localhost:7700/indexes/hook-events/search' \
 ```
 ┌──────────────────────┬──────────────────────┐
 │                      │                      │
-│   MeiliSearch        │   hooks-store        │
-│   (port 7700)        │   (port 9800)        │
+│   Milvus (Docker)    │   hooks-store        │
+│   (port 19530)       │   (port 9800)        │
 │                      │                      │
 ├──────────────────────┼──────────────────────┤
 │                      │                      │
@@ -242,29 +219,106 @@ curl -s 'http://localhost:7700/indexes/hook-events/search' \
 
 ## Quick Reference — All Ports
 
-| Service        | Port | Purpose |
-|---------------|------|---------|
-| MeiliSearch   | 7700 | Search engine + dashboard |
-| Monitor       | 8080 | Hook event receiver + TUI |
-| hooks-store   | 9800 | Ingest → MeiliSearch bridge |
+| Service        | Port  | Purpose |
+|---------------|-------|---------|
+| Milvus        | 19530 | Vector + scalar database |
+| Milvus WebUI  | 9091  | Milvus dashboard |
+| Attu          | 3000  | Milvus GUI (root, no password) |
+| MinIO Console | 9001  | Object storage dashboard |
+| embed-svc     | 8900  | Text embeddings (ONNX) |
+| Monitor       | 8080  | Hook event receiver + TUI |
+| hooks-store   | 9800  | Ingest → Milvus bridge |
 
 ## Quick Reference — Health Checks
 
 ```bash
-curl -s http://localhost:7700/health | jq .     # MeiliSearch
-curl -s http://localhost:8080/health | jq .     # Monitor
-curl -s http://localhost:9800/health | jq .     # hooks-store
+curl -s http://localhost:19530/v2/vectordb/collections/list | jq .  # Milvus
+curl -s http://localhost:8900/health | jq .                         # embed-svc
+curl -s http://localhost:8080/health | jq .                         # Monitor
+curl -s http://localhost:9800/health | jq .                         # hooks-store
 ```
+
+## Activating BM25 Full-Text Search
+
+Milvus v2.5.6+ supports built-in BM25 functions that auto-generate sparse vectors from text fields. This replaces slow LIKE queries with proper relevance-ranked full-text search and enables native hybrid search (dense + sparse + RRF) in a single Milvus call.
+
+### What changes
+
+- **hook_events**: `data_flat` gets an English analyzer; a new `sparse_embedding` SparseFloatVector field is auto-populated by a BM25 function on insert.
+- **hook_prompts**: `prompt` gets the same treatment.
+- **hook_sessions**: unchanged.
+- **search-events** tool: uses BM25 instead of LIKE for keyword search.
+- **recall-context** tool: uses native Milvus `hybrid_search` (dense + sparse + RRF) instead of client-side RRF.
+
+### Migration steps
+
+BM25 functions cannot be added to existing collections — they must be recreated.
+
+**1. Stop hooks-store** if running.
+
+**2. Rebuild hooks-store** (picks up new schema definitions):
+
+```bash
+cd hooks-store && make build
+```
+
+**3. Recreate collections** with the `--recreate-collections` flag:
+
+```bash
+./bin/hooks-store --recreate-collections
+```
+
+This drops `hook_events`, `hook_prompts`, and `hook_sessions`, then recreates them with the new schema (analyzer-enabled text fields, sparse vector fields, BM25 functions, and sparse indexes).
+
+> **Warning**: This deletes all existing data in those collections. If you need to preserve data, export it first via Attu or the Milvus backup tool.
+
+**4. Verify in Attu** (http://localhost:3000):
+
+- Open each collection's schema tab
+- Confirm `sparse_embedding` field exists (type: SparseFloatVector)
+- Confirm `data_flat` (events) / `prompt` (prompts) shows `enable_analyzer: true`
+- Check the Functions tab shows `bm25_events` / `bm25_prompts`
+
+**5. Rebuild and reinstall hooks-mcp**:
+
+```bash
+cd hooks-mcp && make build && make install
+```
+
+**6. Restart hooks-store normally** (without the flag):
+
+```bash
+cd hooks-store && ./bin/hooks-store
+```
+
+**7. Ingest some events** and verify in Attu that the `sparse_embedding` column is populated (non-empty sparse vectors) for new records.
+
+**8. Test the MCP tools**:
+
+- `search-events` with a query — results should be ranked by BM25 relevance
+- `recall-context` — should use native hybrid search (check hooks-mcp stderr for any fallback warnings)
+
+### After migration
+
+The `--recreate-collections` flag is only needed once for the schema migration. Subsequent starts use the normal command without the flag. New events automatically get sparse vectors generated by Milvus — no changes to embed-svc or the ingest pipeline are needed.
+
+---
 
 ## Troubleshooting
 
-**hooks-store fails to start**: MeiliSearch must be running first.
+**hooks-store fails to start**: Milvus must be running first. Run `cd docker && docker compose up -d`.
 
-**Events not reaching MeiliSearch**: Check `forward = yes` in the `[sink]` section
-of `~/.config/claude-hooks-monitor/hook_monitor.conf`. The monitor must be restarted
+**Events not reaching Milvus**: Check `forward = yes` in the `[sink]` section
+of `~/.config/hooks-monitor/hook_monitor.conf`. The monitor must be restarted
 after changing this setting.
+
+**Semantic search returns no results**: Ensure embed-svc is running and events have `dense_valid = true`. Events ingested without embed-svc get zero vectors.
 
 **hook-client not found**: Ensure `~/.local/bin` is in your PATH.
 
 **Port already in use**: Another instance may be running. Check with:
-`lsof -i:8080` / `lsof -i:9800` / `lsof -i:7700`
+`lsof -i:8080` / `lsof -i:9800` / `lsof -i:19530`
+
+**BM25 search returns errors**: Collections were created before the BM25 migration. Run `hooks-store --recreate-collections` once to recreate them with the new schema (destroys existing data).
+
+**Milvus version too old for BM25**: BM25 built-in functions require Milvus v2.5.6+. Check with `curl -s http://localhost:19530/v2/vectordb/collections/list` — the response includes the server version. Update via `docker compose pull && docker compose up -d` in the `docker/` directory.

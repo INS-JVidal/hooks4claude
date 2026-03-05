@@ -1,6 +1,7 @@
-// Package meili provides a typed MeiliSearch client wrapper for querying
-// hook event data. It decouples tool handlers from the concrete MeiliSearch
-// SDK via the Searcher interface.
+//go:build meili
+
+// MeiliClient is the original MeiliSearch implementation of Searcher.
+// Preserved for reference. Build with -tags=meili to compile.
 package meili
 
 import (
@@ -23,6 +24,9 @@ type Searcher interface {
 	SearchEvents(ctx context.Context, opts EventSearchOpts) ([]EventHit, int64, error)
 	FacetEvents(ctx context.Context, filter string, facets []string) (*FacetResult, error)
 	ResolveSessionPrefix(ctx context.Context, prefix string) (string, error)
+	SemanticSearchPrompts(ctx context.Context, queryText string, opts PromptSearchOpts) ([]PromptHit, error)
+	SemanticSearchEvents(ctx context.Context, queryText string, opts EventSearchOpts) ([]EventHit, error)
+	HybridSearch(ctx context.Context, queryText string, opts EventSearchOpts) ([]EventHit, error)
 }
 
 // SessionSearchOpts controls session queries.
@@ -370,6 +374,21 @@ func buildEventFilter(opts EventSearchOpts) string {
 // BuildEventFilter is exported for tools that need custom filter construction.
 func BuildEventFilter(opts EventSearchOpts) string {
 	return buildEventFilter(opts)
+}
+
+// SemanticSearchPrompts is a stub — MeiliSearch has no vector search.
+func (c *MeiliClient) SemanticSearchPrompts(ctx context.Context, queryText string, opts PromptSearchOpts) ([]PromptHit, error) {
+	return nil, nil
+}
+
+// SemanticSearchEvents is a stub — MeiliSearch has no vector search.
+func (c *MeiliClient) SemanticSearchEvents(ctx context.Context, queryText string, opts EventSearchOpts) ([]EventHit, error) {
+	return nil, nil
+}
+
+// HybridSearch is a stub — MeiliSearch has no vector search.
+func (c *MeiliClient) HybridSearch(ctx context.Context, queryText string, opts EventSearchOpts) ([]EventHit, error) {
+	return nil, nil
 }
 
 func clamp(val, defaultVal, maxVal int64) int64 {

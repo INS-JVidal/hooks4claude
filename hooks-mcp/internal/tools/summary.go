@@ -31,8 +31,8 @@ func makeSessionSummary(s meili.Searcher) mcp.ToolHandlerFor[SessionSummaryInput
 
 		// Fetch session summary from sessions index.
 		sessions, _, err := s.SearchSessions(ctx, meili.SessionSearchOpts{
-			Query: sessionID,
-			Limit: 1,
+			SessionID: sessionID,
+			Limit:     1,
 		})
 		if err != nil {
 			return errResult(err.Error()), nil, nil

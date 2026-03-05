@@ -35,7 +35,7 @@ func makeSearchEvents(s meili.Searcher) mcp.ToolHandlerFor[SearchEventsInput, an
 			return errRes, nil, nil
 		}
 
-		hits, total, err := s.SearchEvents(ctx, meili.EventSearchOpts{
+		opts := meili.EventSearchOpts{
 			Query:       in.Query,
 			ProjectName: in.ProjectName,
 			SessionID:   resolved.SessionID,
@@ -43,14 +43,26 @@ func makeSearchEvents(s meili.Searcher) mcp.ToolHandlerFor[SearchEventsInput, an
 			ToolName:    in.ToolName,
 			DateRange:   resolved.DateRange,
 			Limit:       int64(in.Limit),
-		})
+		}
+
+		// Use BM25 full-text search for relevance-ranked results.
+		hits, err := s.FullTextSearchEvents(ctx, in.Query, opts)
 		if err != nil {
-			return errResult(err.Error()), nil, nil
+			// Fall back to LIKE-based search on BM25 failure.
+			var fallbackErr error
+			hits2, total, fallbackErr := s.SearchEvents(ctx, opts)
+			if fallbackErr != nil {
+				return errResult(err.Error()), nil, nil
+			}
+			hits = hits2
+			_ = total
 		}
 
 		if len(hits) == 0 {
 			return textResult("No events found."), nil, nil
 		}
+
+		total := int64(len(hits))
 
 		var b strings.Builder
 		fmt.Fprintf(&b, "Events matching %q (%d total):\n\n", in.Query, total)

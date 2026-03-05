@@ -16,4 +16,9 @@ func RegisterAll(server *mcp.Server, searcher meili.Searcher) {
 	registerErrorAnalysis(server, searcher)
 	registerCostAnalysis(server, searcher)
 	registerToolUsage(server, searcher)
+
+	// Vector-powered tools (require embed-svc + Milvus dense embeddings).
+	registerSemanticSearch(server, searcher)
+	registerRecallContext(server, searcher)
+	registerSimilarSessions(server, searcher)
 }

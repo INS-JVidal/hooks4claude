@@ -1,4 +1,4 @@
-# ingest — HTTP ingest server receiving hook events from the monitor
+# ingest — HTTP + UDS ingest server receiving hook events from the monitor
 
 All files stable — prefer this summary over reading source files.
 
@@ -32,4 +32,20 @@ Tests: TestHandleIngest_Success, _MethodNotAllowed, _EmptyBody, _InvalidJSON, _M
 
 Tests: TestEndToEnd_WireFormat, _AllHookTypes (15 types), _CompanionDown, _ConcurrentBurst (100 goroutines). Simulates full monitor→companion pipeline using httptest.NewServer.
 
-Imports: `hookevt` (HookEvent), `store` (EventStore, Document, HookEventToDocument).
+## udsserver.go
+
+```go
+type UDSIngestServer struct { /* unexported fields */ }
+func NewUDS(socketPath string, s store.EventStore) (*UDSIngestServer, error)
+func (u *UDSIngestServer) SetOnIngest(fn func(IngestEvent))
+func (u *UDSIngestServer) Serve(ctx context.Context) error
+func (u *UDSIngestServer) Close() error
+```
+
+Accepts framed MsgEvent (0x01) messages over UDS. Same validation as HTTP handler. Accepts multiple messages per connection.
+
+## uds_integration_test.go
+
+Tests: TestUDS_RoundTrip, _AllHookTypes, _ConcurrentBurst (20 goroutines), _EmptyPayload, _MissingHookType.
+
+Imports: `hookevt` (HookEvent), `store` (EventStore, Document, HookEventToDocument), `shared/uds`.

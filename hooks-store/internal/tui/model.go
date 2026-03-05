@@ -16,8 +16,8 @@ const maxRecentEvents = 4
 // Config holds the static information displayed in the TUI header.
 type Config struct {
 	Version    string
-	MeiliURL   string
-	MeiliIndex string
+	MilvusURL  string
+	EventsCol  string
 	ListenAddr string
 }
 
@@ -98,7 +98,7 @@ func (m Model) View() string {
 	b.WriteString(sep + "\n")
 
 	// Config block
-	b.WriteString("  " + labelStyle.Render("MeiliSearch:") + "  " + valueStyle.Render(fmt.Sprintf("%s (index: %s)", m.cfg.MeiliURL, m.cfg.MeiliIndex)) + "\n")
+	b.WriteString("  " + labelStyle.Render("Milvus:") + "  " + valueStyle.Render(fmt.Sprintf("%s (collection: %s)", m.cfg.MilvusURL, m.cfg.EventsCol)) + "\n")
 	b.WriteString("  " + labelStyle.Render("Listening:") + "    " + valueStyle.Render(m.cfg.ListenAddr) + "\n")
 	b.WriteString("  " + labelStyle.Render("Endpoints:") + "    " + valueStyle.Render("POST /ingest  GET /health  GET /stats") + "\n")
 	b.WriteString(sep + "\n")

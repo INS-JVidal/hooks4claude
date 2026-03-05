@@ -28,20 +28,46 @@ type IngestEvent struct {
 	Timestamp time.Time
 }
 
+// BufferStats provides optional buffer metrics for the /stats endpoint.
+type BufferStats interface {
+	Buffered() int
+	Dropped() int64
+}
+
+// IngestStats provides ingest counters from an additional source (e.g. UDS server).
+type IngestStats interface {
+	Ingested() int64
+	Errors() int64
+	LastEvent() time.Time
+}
+
 // Server is the HTTP ingest server for receiving hook events from the monitor.
 type Server struct {
-	store     store.EventStore
-	mux       *http.ServeMux
-	ingested  atomic.Int64
-	errors    atomic.Int64
-	lastEvent atomic.Value // stores time.Time
-	onIngest  func(IngestEvent)
+	store       store.EventStore
+	mux         *http.ServeMux
+	ingested    atomic.Int64
+	errors      atomic.Int64
+	lastEvent   atomic.Value // stores time.Time
+	onIngest    func(IngestEvent, []byte)
+	bufferStats BufferStats
+	udsStats    IngestStats
 }
 
 // SetOnIngest registers a callback invoked after each successful ingest.
+// The second argument is the raw JSON payload (for pub broadcast without re-marshaling).
 // The callback must be non-blocking (e.g. a non-blocking channel send).
-func (s *Server) SetOnIngest(fn func(IngestEvent)) {
+func (s *Server) SetOnIngest(fn func(IngestEvent, []byte)) {
 	s.onIngest = fn
+}
+
+// SetBufferStats registers a BufferStats provider for the /stats endpoint.
+func (s *Server) SetBufferStats(bs BufferStats) {
+	s.bufferStats = bs
+}
+
+// SetUDSStats registers a UDS ingest stats provider for the /stats endpoint.
+func (s *Server) SetUDSStats(us IngestStats) {
+	s.udsStats = us
 }
 
 // ErrCount returns the atomic error counter for direct reads by the TUI.
@@ -127,7 +153,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			SessionID: sessionID,
 			BodySize:  len(body),
 			Timestamp: evt.Timestamp,
-		})
+		}, body)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -163,15 +189,37 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := map[string]interface{}{
-		"ingested": s.ingested.Load(),
-		"errors":   s.errors.Load(),
+	ingested := s.ingested.Load()
+	errors := s.errors.Load()
+	if s.udsStats != nil {
+		ingested += s.udsStats.Ingested()
+		errors += s.udsStats.Errors()
 	}
 
+	resp := map[string]interface{}{
+		"ingested": ingested,
+		"errors":   errors,
+	}
+
+	// Use the most recent event time from either HTTP or UDS path.
+	var lastTime time.Time
 	if last := s.lastEvent.Load(); last != nil {
 		if t, ok := last.(time.Time); ok {
-			resp["last_event"] = t.Format(time.RFC3339)
+			lastTime = t
 		}
+	}
+	if s.udsStats != nil {
+		if udsLast := s.udsStats.LastEvent(); udsLast.After(lastTime) {
+			lastTime = udsLast
+		}
+	}
+	if !lastTime.IsZero() {
+		resp["last_event"] = lastTime.Format(time.RFC3339)
+	}
+
+	if s.bufferStats != nil {
+		resp["buffered"] = s.bufferStats.Buffered()
+		resp["dropped"] = s.bufferStats.Dropped()
 	}
 
 	w.Header().Set("Content-Type", "application/json")

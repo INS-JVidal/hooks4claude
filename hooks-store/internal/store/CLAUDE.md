@@ -1,45 +1,25 @@
-# store — MeiliSearch storage layer for hook event documents
-
-All files stable — prefer this summary over reading source files.
+# store — Milvus storage layer for hook event documents
 
 ## store.go
 
 ```go
-type PromptDocument struct {
-    ID             string `json:"id"`
-    HookType       string `json:"hook_type"`
-    Timestamp      string `json:"timestamp"`
-    TimestampUnix  int64  `json:"timestamp_unix"`
-    SessionID      string `json:"session_id,omitempty"`
-    Prompt         string `json:"prompt"`
-    PromptLength   int    `json:"prompt_length"`
-    Cwd            string `json:"cwd,omitempty"`
-    ProjectDir     string `json:"project_dir,omitempty"`
-    PermissionMode string `json:"permission_mode,omitempty"`
-    HasClaudeMD    bool   `json:"has_claude_md"`
+type Document struct {
+    ID, HookType, Timestamp, SessionID, ToolName string
+    TimestampUnix, InputTokens, OutputTokens, CacheReadTokens, CacheCreateTokens int64
+    CostUSD float64
+    HasClaudeMD, DenseValid bool
+    Prompt, FilePath, ErrorMessage, ProjectDir, ProjectName, PermissionMode, Cwd string
+    DataFlat, DataJSON string
+    DenseEmbedding []float32
+    Data map[string]interface{}
 }
 
-type Document struct {
-    ID                string                 `json:"id"`
-    HookType          string                 `json:"hook_type"`
-    Timestamp         string                 `json:"timestamp"`
-    TimestampUnix     int64                  `json:"timestamp_unix"`
-    SessionID         string                 `json:"session_id,omitempty"`
-    ToolName          string                 `json:"tool_name,omitempty"`
-    HasClaudeMD       bool                   `json:"has_claude_md"`
-    InputTokens       int64                  `json:"input_tokens,omitempty"`
-    OutputTokens      int64                  `json:"output_tokens,omitempty"`
-    CacheReadTokens   int64                  `json:"cache_read_tokens,omitempty"`
-    CacheCreateTokens int64                  `json:"cache_create_tokens,omitempty"`
-    CostUSD           float64                `json:"cost_usd,omitempty"`
-    Prompt            string                 `json:"prompt,omitempty"`
-    FilePath          string                 `json:"file_path,omitempty"`
-    ErrorMessage      string                 `json:"error_message,omitempty"`
-    ProjectDir        string                 `json:"project_dir,omitempty"`
-    PermissionMode    string                 `json:"permission_mode,omitempty"`
-    Cwd               string                 `json:"cwd,omitempty"`
-    DataFlat          string                 `json:"data_flat"`
-    Data              map[string]interface{} `json:"data"`
+type PromptDocument struct {
+    ID, HookType, Timestamp, SessionID, Prompt, Cwd, ProjectDir, PermissionMode string
+    TimestampUnix int64
+    PromptLength int
+    HasClaudeMD, DenseValid bool
+    PromptDense []float32
 }
 
 type EventStore interface {
@@ -48,55 +28,35 @@ type EventStore interface {
 }
 ```
 
-## meili.go
+## milvus.go
 
 ```go
-type MeiliStore struct { /* unexported fields: client, index, indexPrompts */ }
-func NewMeiliStore(endpoint, apiKey, indexName, promptsIndexName string) (*MeiliStore, error)
-func (s *MeiliStore) Index(ctx context.Context, doc Document) error
-func (s *MeiliStore) MigrateDocuments(ctx context.Context, batchSize int) (int, error)
-func (s *MeiliStore) MigrateDataFlat(ctx context.Context, batchSize int) (int, error)
-func (s *MeiliStore) MigratePrompts(ctx context.Context, batchSize int) (int, error)
-func (s *MeiliStore) Close() error
+type MilvusStore struct { /* client, embedder, collection names */ }
+func NewMilvusStore(milvusURL, milvusToken, eventsCol, promptsCol, sessionsCol, embedURL string) (*MilvusStore, error)
+func (s *MilvusStore) Index(ctx context.Context, doc Document) error
+func (s *MilvusStore) Close() error
+func EmbeddingText(doc Document) string
+func DataToJSON(data map[string]interface{}) string
 ```
 
-MeiliStore implements EventStore. NewMeiliStore verifies connectivity, creates the main index and optionally a dedicated prompts index (if `promptsIndexName` is non-empty), configures searchable/filterable/sortable attributes, and waits for each settings task to complete. Thread-safe (SDK client is thread-safe).
+MilvusStore implements EventStore. NewMilvusStore creates MilvusClient + Embedder, ensures collections exist with correct schemas (hook_events, hook_prompts, hook_sessions). Thread-safe.
 
-**Main index (hook-events):**
-Searchable: hook_type, tool_name, session_id, prompt, error_message, data_flat.
-Filterable: hook_type, session_id, tool_name, timestamp_unix, has_claude_md, cost_usd, project_dir, permission_mode, file_path, cwd.
-Sortable: timestamp_unix, cost_usd, input_tokens, output_tokens.
+Index() generates embedding via embed-svc (fail-soft: zero vector + dense_valid=false), truncates fields to VarChar limits, inserts into Milvus. Dual-writes UserPromptSubmit events to prompts collection.
 
-**Prompts index (hook-prompts):**
-Searchable: prompt, session_id.
-Filterable: session_id, timestamp_unix, project_dir, permission_mode, has_claude_md, cwd, prompt_length.
-Sortable: timestamp_unix, prompt_length.
+Collections: hook_events (FloatVector 384 + scalars), hook_prompts (FloatVector 384 + scalars), hook_sessions (scalar only, dummy FloatVector 2).
 
-Both indexes: pagination maxTotalHits 10000, faceting maxValuesPerFacet 500.
+## milvus_client.go
 
-Index() dual-writes UserPromptSubmit events to both indexes. Prompts write is fail-soft (logs to stderr).
+Thin HTTP client for Milvus REST API v2. Methods: HasCollection, CreateCollection, Insert, Upsert, Query, Search, HybridSearch. Exponential backoff retry (3 attempts, 1s→2s→4s).
 
-MigrateDocuments backfills top-level fields on existing documents. MigrateDataFlat rewrites data_flat from JSON serialization to values-only format using extractStringValues. MigratePrompts scans the main index, filters UserPromptSubmit events client-side, and indexes PromptDocuments into the prompts index. Must run after MigrateDocuments.
+## embedder.go
 
-Helpers: waitForSettingsTask, setupPromptsIndex, extractMigrationFields, extractPromptMigrationFields. MigrateDataFlat uses extractStringValues from transform.go.
+HTTP client for embed-svc. Circuit breaker: 3 consecutive failures → skip for 30s. Returns nil on circuit open (caller uses zero vector).
 
 ## transform.go
 
-```go
-func HookEventToDocument(evt hookevt.HookEvent) Document
-func DocumentToPromptDocument(doc Document) PromptDocument
-```
+HookEventToDocument, DocumentToPromptDocument, extractStringValues, extractTokenMetrics, and field extraction helpers. Unchanged from MeiliSearch version.
 
-HookEventToDocument converts wire-format HookEvent to MeiliSearch Document. Generates UUID, extracts session_id/tool_name, prompt, file_path (from tool_input), error_message, permission_mode, cwd, project_dir (from _monitor), has_claude_md (from _monitor metadata), and token/cost metrics (defensive multi-path extraction). Generates DataFlat via `extractStringValues()` — space-separated string of leaf values from the data map (values only, no JSON keys).
+## meili.go (build-tagged)
 
-`extractStringValues(data)` recursively walks the data map and collects only string leaf values, skipping keys, numbers, booleans, and nulls. `collectStringValues(v, *values)` is its recursive helper.
-
-DocumentToPromptDocument converts a Document to a lean PromptDocument for the prompts index. Computes PromptLength = len(Prompt) (byte count).
-
-Helpers: extractString, extractBool, extractFloat64, extractNestedMap, extractTokenMetrics, extractStringValues, collectStringValues.
-
-## transform_test.go
-
-Tests: TestHookEventToDocument_BasicFields, _DataFlat, _MissingOptionalFields, _EmptyData, _NilData, _NonStringFieldValues, _UniqueIDs, _Prompt, _Prompt_Missing, _FilePath, _FilePath_NoToolInput, _ErrorMessage, _ProjectDir, _PermissionMode, _HasClaudeMD, _HasClaudeMD_Missing, _Cwd, _Cwd_Missing, _TokenMetrics_TopLevel, _TokenMetrics_NestedUsage, _TokenMetrics_StopHookData, _TokenMetrics_Missing, TestDocumentToPromptDocument, TestDocumentToPromptDocument_EmptyPrompt, _TimestampUTC. All with t.Parallel().
-
-Imports: `hookevt` (HookEvent type). External: `github.com/google/uuid`, `github.com/meilisearch/meilisearch-go`.
+Original MeiliSearch backend, excluded from default build via `//go:build meili`.

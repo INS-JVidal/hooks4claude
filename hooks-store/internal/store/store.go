@@ -21,10 +21,14 @@ type Document struct {
 	FilePath          string                 `json:"file_path,omitempty"`
 	ErrorMessage      string                 `json:"error_message,omitempty"`
 	ProjectDir        string                 `json:"project_dir,omitempty"`
+	ProjectName       string                 `json:"project_name,omitempty"`
 	PermissionMode    string                 `json:"permission_mode,omitempty"`
 	Cwd               string                 `json:"cwd,omitempty"`
 	DataFlat          string                 `json:"data_flat"`
-	Data          map[string]interface{} `json:"data"`
+	Data              map[string]interface{} `json:"data"`
+	DenseEmbedding    []float32              `json:"dense_embedding,omitempty"`
+	DenseValid        bool                   `json:"dense_valid"`
+	DataJSON          string                 `json:"data_json,omitempty"`
 }
 
 // PromptDocument is a lean MeiliSearch document for the dedicated prompts index.
@@ -40,7 +44,9 @@ type PromptDocument struct {
 	Cwd            string `json:"cwd,omitempty"`
 	ProjectDir     string `json:"project_dir,omitempty"`
 	PermissionMode string `json:"permission_mode,omitempty"`
-	HasClaudeMD    bool   `json:"has_claude_md"`
+	HasClaudeMD    bool      `json:"has_claude_md"`
+	PromptDense    []float32 `json:"prompt_dense,omitempty"`
+	DenseValid     bool      `json:"dense_valid"`
 }
 
 // EventStore is the storage port for persisting hook event documents.
